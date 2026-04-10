@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur Bessel</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; }
+        .header { text-align: center; background-color: #007bff; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        .inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 5px; }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+        input.calculated { background-color: #d4edda !important; border-color: #28a745 !important; font-weight: bold; }
+        input:invalid { border-color: #ff0000; }
+        button { grid-column: span 3; padding: 15px; background-color: #28a745; color: white; border: none; border-radius: 5px; font-size: 18px; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        .output { background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-top: 20px; }
+        .result { font-size: 24px; font-weight: bold; color: #007bff; text-align: center; margin: 10px 0; }
+        .error { color: #dc3545; text-align: center; font-weight: bold; }
+        @media (max-width: 600px) { .inputs { grid-template-columns: 1fr; } button { grid-column: span 1; } }
+        .buttons { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 20px; }
+        #btnReset { background-color: #dc3545; color: white; }
+        #btnReset:hover { background-color: #c82333; }
+        @media (max-width: 600px) { .buttons { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div style="max-width: 600px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        
+        <div class="header">
+            <h1 style="margin: 0; font-size: 28px;">Calculateur Table de Bessel</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px;"> • Kuipou Souoguem Tadjuge Muriel Pierrette • Hadja Sadjo Nafissatou • Lekeu Ngameni Rudy</p>
+        </div>
+
+        <div class="inputs" style="margin: 30px 0;">
+            <div class="input-group">
+                <label for="pr">Pr (%):</label>
+                <input type="number" id="pr" step="0.0001" min="0" max="100" placeholder="ex: 3">
+            </div>
+            <div class="input-group">
+                <label for="n">N (canaux):</label>
+                <input type="number" id="n" min="0" placeholder="ex: 30">
+            </div>
+            <div class="input-group">
+                <label for="a">A (Erlang):</label>
+                <input type="number" id="a" step="0.01" min="0" placeholder="ex: 23.06">
+            </div>
+        </div>
+
+        <div class="buttons" style="margin-bottom: 30px;">
+            <button id="btnReset" onclick="reinitaliser()" style="padding: 15px; font-size: 16px;">🗑️ Réinitialiser</button>
+            <button id="btnCalcul" onclick="calculer()" style="padding: 15px; font-size: 16px;">🚀 Calculer</button>
+        </div>
+
+        <div id="resultat" class="output" style="display: none; text-align: center;">
+            <div id="resultValue" class="result"></div>
+            <div id="erreur" class="error" style="display: none;"></div>
+        </div>
+
+    </div>
+</body>
+    <script>
+        function erlangB(A, N) {
+            if (N === 0) return 1;
+            let term = 1, invSum = 1;
+            for (let k = 1; k <= N; k++) {
+                term *= A / k;
+                invSum += term;
+            }
+            return term / invSum;
+        }
+
+        function calculerPr(A, N) { return erlangB(A, N) * 100; }
+        
+        function findN(pr, A, maxIter=100, tol=1e-4) {
+            pr /= 100;
+            let low = Math.max(1, Math.floor(A - 20));
+            let high = Math.ceil(A * 2 + 20);
+            for (let iter = 0; iter < maxIter; iter++) {
+                let mid = Math.floor((low + high) / 2);
+                let p = erlangB(A, mid);
+                if (Math.abs(p - pr) < tol) return mid;
+                if (p > pr) low = mid + 1; else high = mid;
+            }
+            return Math.floor((low + high) / 2);
+        }
+
+        function findA(N, pr, maxIter=100, tol=1e-4) {
+            if (pr > 100 || pr < 0) return NaN;
+            pr /= 100;
+            let low = 0, high = N * 3;
+            for (let iter = 0; iter < maxIter; iter++) {
+                let mid = (low + high) / 2;
+                let p = erlangB(mid, N);
+                if (Math.abs(p - pr) < tol) return mid;
+                if (p > pr) high = mid; else low = mid;
+            }
+            return (low + high) / 2;
+        }
+
+        function calculer() {
+            const prInput = document.getElementById('pr');
+            const nInput = document.getElementById('n');
+            const aInput = document.getElementById('a');
+            
+            const pr = parseFloat(prInput.value) || NaN;
+            const n = parseInt(nInput.value) || NaN;
+            const a = parseFloat(aInput.value) || NaN;
+            
+            // Reset
+            prInput.classList.remove('calculated');
+            nInput.classList.remove('calculated');
+            aInput.classList.remove('calculated');
+            
+            const filledCount = [isFinite(pr), isFinite(n), isFinite(a)].filter(Boolean).length;
+            
+            if (filledCount !== 2) {
+                showError(filledCount === 0 ? 'Remplissez exactement 2 cases' : 'Exactement 2 cases');
+                return;
+            }
+            
+            let resultText = '';
+            
+            if (!isFinite(pr) && isFinite(n) && isFinite(a)) {
+                const result = calculerPr(a, n);
+                prInput.value = result.toFixed(4);
+                prInput.classList.add('calculated');
+                resultText = `Pr = ${result.toFixed(4)}%`;
+                
+            } else if (!isFinite(n) && isFinite(pr) && isFinite(a)) {
+                const result = findN(pr, a);
+                nInput.value = result;
+                nInput.classList.add('calculated');
+                resultText = `N = ${result}`;
+                
+            } else if (!isFinite(a) && isFinite(pr) && isFinite(n)) {
+                const result = findA(n, pr);
+                if (!isFinite(result)) {
+                    showError('Pr invalide (0-100%)');
+                    return;
+                }
+                aInput.value = result.toFixed(2);
+                aInput.classList.add('calculated');
+                resultText = `A = ${result.toFixed(2)} Erlang`;
+            }
+            
+            document.getElementById('resultValue').textContent = resultText;
+            document.getElementById('resultat').style.display = 'block';
+            document.getElementById('erreur').style.display = 'none';
+        }
+        
+        function showError(msg) {
+            document.getElementById('resultat').style.display = 'block';
+            document.getElementById('resultValue').textContent = '';
+            document.getElementById('erreur').textContent = msg;
+            document.getElementById('erreur').style.display = 'block';
+        }
+        document.addEventListener('keypress', e => e.key === 'Enter' && calculer());
+        function reinitaliser() {
+            document.getElementById('pr').value = '';
+            document.getElementById('n').value = '';
+            document.getElementById('a').value = '';
+            [document.getElementById('pr'), document.getElementById('n'), document.getElementById('a')].forEach(input => {
+            input.classList.remove('calculated');
+        });
+    document.getElementById('resultat').style.display = 'none';
+}
+    </script>
+</body>
+</html>
